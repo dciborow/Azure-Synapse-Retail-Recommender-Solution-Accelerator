@@ -11,7 +11,7 @@ from azureml.core.compute import AksCompute, ComputeTarget
 from azureml.core.compute_target import ComputeTargetException
 
 
-def connectToWorkspace (tenant_id, service_principal_id, service_principal_password, subscription_id, resource_group, workspace_name):
+def connectToWorkspace(tenant_id, service_principal_id, service_principal_password, subscription_id, resource_group, workspace_name):
     svc_pr = ServicePrincipalAuthentication(
             tenant_id=tenant_id,
             service_principal_id=service_principal_id,
@@ -21,7 +21,7 @@ def connectToWorkspace (tenant_id, service_principal_id, service_principal_passw
                     resource_group=resource_group,
                     workspace_name=workspace_name,
                     auth=svc_pr)
-    print("Found workspace {}, authentication successful.".format(ws.name))
+    print(f"Found workspace {ws.name}, authentication successful.")
 
     return ws
 
