@@ -55,16 +55,24 @@ def init():
         ## returns the paths to all the files in the target director in ADLS
         adls_paths = [file_path.name.split("/")[-1] for file_path in file_system_client.get_paths(path=target_adls_directory) if not file_path.is_directory][1:]
         ## need to generate list of local paths to write the files to
-        local_paths = [os.path.normpath(os.getcwd()+f"/model/{model_name}/"+sink_local_dir+"/"+file_name) for file_name in adls_paths]
+        local_paths = [
+            os.path.normpath(
+                f"{os.getcwd()}/model/{model_name}/"
+                + sink_local_dir
+                + "/"
+                + file_name
+            )
+            for file_name in adls_paths
+        ]
+
         for idx, file_to_write in enumerate(adls_paths):
             try:
                 print(f"Writing {file_to_write}...")
-                local_file = open(local_paths[idx],'wb')
-                file_client = directory_client.get_file_client(file_to_write)
-                download = file_client.download_file()
-                downloaded_bytes = download.readall()
-                local_file.write(downloaded_bytes)
-                local_file.close()
+                with open(local_paths[idx],'wb') as local_file:
+                    file_client = directory_client.get_file_client(file_to_write)
+                    download = file_client.download_file()
+                    downloaded_bytes = download.readall()
+                    local_file.write(downloaded_bytes)
                 print(f"Finished writing {file_to_write}. {len(adls_paths)-(idx+1)} left.")
             except Exception as e:
                 print(e)
@@ -100,17 +108,18 @@ def init():
             def _cosine_similarity(self, vector_1, vector_2):
                 v1 = np.asarray(vector_1)
                 v2 = np.asarray(vector_2)
-                cs = v1.dot(v2) / (LA.norm(v1) * LA.norm(v2))
-                return(cs)
+                return v1.dot(v2) / (LA.norm(v1) * LA.norm(v2))
 
     def connect_to_adls(acct_name, acct_key, fs):
         try:
             global service_client
-            
-            service_client = DataLakeServiceClient(account_url="{}://{}.dfs.core.windows.net".format(
-                "https", acct_name), credential=acct_key)
-            file_system_client = service_client.get_file_system_client(file_system=fs)
-            return file_system_client
+
+            service_client = DataLakeServiceClient(
+                account_url=f"https://{acct_name}.dfs.core.windows.net",
+                credential=acct_key,
+            )
+
+            return service_client.get_file_system_client(file_system=fs)
         except Exception as e:
             print(e)
             return e
@@ -127,15 +136,17 @@ def init():
             downloaded_bytes = download.readall()
 
             pickle.dump(downloaded_bytes, open(f"{obj_name_to_write}.pkl", "wb"))
-            pkl_obj_to_return = pickle.load(BytesIO(pickle.load( open(f"{obj_name_to_write}.pkl", "rb"))))
-            return pkl_obj_to_return
+            return pickle.load(
+                BytesIO(pickle.load(open(f"{obj_name_to_write}.pkl", "rb")))
+            )
+
         except Exception as e:
             print(e)
             return e
 
     def prep_dirs_for_write(dirs_to_write, model_name, model_dir="model"):
         for directory in dirs_to_write:
-            print(os.path.normpath(os.getcwd()+f"/{model_dir}/{model_name}/"+directory))
+            print(os.path.normpath(f"{os.getcwd()}/{model_dir}/{model_name}/" + directory))
             if not os.path.exists(os.path.normpath(os.getcwd()+f"/{model_dir}/{model_name}/"+directory)):
                 os.makedirs(os.path.normpath(os.getcwd()+f"/{model_dir}/{model_name}/"+directory))
 
@@ -160,11 +171,8 @@ def run(input_json):
         item_to_score = json.loads(input_json)["product_id"]
         print(item_to_score)
         ret_df = item_based_rec.compute_similarity(item_to_score).orderBy("similarity_score", ascending=False).select("item_index").limit(5)
-        rec_obj = json.dumps({"related_products":[row[0] for row in ret_df.collect()]})
-
-        return rec_obj
+        return json.dumps({"related_products":[row[0] for row in ret_df.collect()]})
 
     except Exception as e:
         logging.error(e)
-        result = str(e)
-        return result
+        return str(e)

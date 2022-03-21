@@ -10,11 +10,13 @@ from azure.storage.filedatalake._models import ContentSettings
 def connect_to_adls(acct_name, acct_key, fs):
     try:
         global service_client
-        
-        service_client = DataLakeServiceClient(account_url="{}://{}.dfs.core.windows.net".format(
-            "https", acct_name), credential=acct_key)
-        file_system_client = service_client.get_file_system_client(file_system=fs)
-        return file_system_client
+
+        service_client = DataLakeServiceClient(
+            account_url=f"https://{acct_name}.dfs.core.windows.net",
+            credential=acct_key,
+        )
+
+        return service_client.get_file_system_client(file_system=fs)
     except Exception as e:
         print(e)
         return e
@@ -25,14 +27,16 @@ def download_file_from_adls(file_system_client, dir_name, obj_name_to_write):
         directory_client = file_system_client.get_directory_client(dir_name)
 
         file_client = directory_client.get_file_client(f"{obj_name_to_write}.pkl")
-    
+
         download = file_client.download_file()
 
         downloaded_bytes = download.readall()
 
         pickle.dump(downloaded_bytes, open(f"{obj_name_to_write}.pkl", "wb"))
-        pkl_obj_to_return = pickle.load(BytesIO(pickle.load( open(f"{obj_name_to_write}.pkl", "rb"))))
-        return pkl_obj_to_return
+        return pickle.load(
+            BytesIO(pickle.load(open(f"{obj_name_to_write}.pkl", "rb")))
+        )
+
     except Exception as e:
         print(e)
         return e
@@ -51,16 +55,24 @@ def copy_files_from_directory(file_system_client, target_adls_directory, sink_lo
     ## returns the paths to all the files in the target director in ADLS
     adls_paths = [file_path.name.split("/")[-1] for file_path in file_system_client.get_paths(path=target_adls_directory) if not file_path.is_directory][1:]
     ## need to generate list of local paths to write the files to
-    local_paths = [os.path.normpath(os.getcwd()+f"\\model\\{model_name}\\"+sink_local_dir+"\\"+file_name) for file_name in adls_paths]
+    local_paths = [
+        os.path.normpath(
+            f"{os.getcwd()}\\model\\{model_name}\\"
+            + sink_local_dir
+            + "\\"
+            + file_name
+        )
+        for file_name in adls_paths
+    ]
+
     for idx, file_to_write in enumerate(adls_paths):
         try:
             print(f"Writing {file_to_write}...")
-            local_file = open(local_paths[idx],'wb')
-            file_client = directory_client.get_file_client(file_to_write)
-            download = file_client.download_file()
-            downloaded_bytes = download.readall()
-            local_file.write(downloaded_bytes)
-            local_file.close()
+            with open(local_paths[idx],'wb') as local_file:
+                file_client = directory_client.get_file_client(file_to_write)
+                download = file_client.download_file()
+                downloaded_bytes = download.readall()
+                local_file.write(downloaded_bytes)
             print(f"Finished writing {file_to_write}. {len(adls_paths)-(idx+1)} left.")
         except Exception as e:
             print(e)
